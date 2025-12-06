@@ -45,7 +45,7 @@ def get_access_token() -> str:
     data = {"grant_type":"client_credentials"}
 
     # request to spotify token endpoint
-    resp = requests.posts(SPOTIFY_TOKEN_URL, headers=headers,data=data,timeout=15)
+    resp = requests.post(SPOTIFY_TOKEN_URL, headers=headers,data=data,timeout=15)
     resp.raise_for_status()
 
     # return access token
@@ -70,7 +70,7 @@ def create_tables(conn: sqlite3.Connection) -> None:
             id INTEGER PRIMARY KEY AUTOINCREMENT, -- internal integer ID
             spotify_id TEXT UNIQUE,               -- Spotify playlist ID
             name TEXT
-            ):
+            );
         """
     )
 
@@ -267,3 +267,40 @@ def fetch_and_store_spotify(db_name: str, max_new_tracks: int =25) -> None:
             for tid in track_ids:
                 if new_tracks_added >= max_new_tracks:
                     break
+
+                name,pop = track_meta[tid]
+                feat = features.get(tid, {})
+
+                valence = feat.get("valence")
+                energy = feat.get("energy")
+
+                # skip tracks with missing audio features
+                if valence is None or energy is None:
+                    continue
+
+                track_db_id, is_new =  upsert_track( conn, tid,name,pop,valence,energy)
+
+                # create row of track relationships
+                link_playlist_track(conn,playlist_db_id,track_db_id)
+
+                if is_new:
+                    new_tracks_added += 1
+            
+            offset += page_size
+
+            if not page.get("next"):
+                break
+    conn.close()
+
+    print(f"New tracks added: {new_tracks_added}")
+
+if __name__ == "__main__":
+    import argparse
+
+    parser = argparse.ArgumentParser(description="Fetch Spotify Data")
+    parser.add_argument("--db", default="final_project.db", help="SQLite DB")
+    parser.add_argument("--max-new-tracks", type=int, default=25,
+                        help="Max new tracks per run")
+    
+    args = parser.parse_args()
+    fetch_and_store_spotify(args.db,args.max_new_tracks)
