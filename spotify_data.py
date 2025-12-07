@@ -16,9 +16,10 @@ import sqlite3
 import requests
 import base64
 from typing import List, Dict, Tuple
+from spotify_credentials import client_id,secret_client
 
 SPOTIFY_TOKEN_URL = "https://accounts.spotify.com/api/token"
-SPOTIFY_API_BASE = "https://apy.spotify.com/v1"
+SPOTIFY_API_BASE = "https://api.spotify.com/v1"
 
 # authorize 
 
@@ -28,8 +29,11 @@ def get_access_token() -> str:
 
     '''
 
-    client_id = os.environ.get("SPOTIFY_CLIENT_ID")
-    client_secret = os.environ.get("SPOTIFY_CLIENT_SECRET")
+    client_id = client_id
+    client_secret = client_secret
+    
+    if not client_id or not client_secret:
+        raise RuntimeError("Set SPOTIFY_CLIENT_ID and SPOTIFY_CLIENT_SECRET first.")
 
     # spotify requires id and secret encoded in Base64
     auth_bytes = f"{client_id}:{client_secret}".encode("utf-8")
