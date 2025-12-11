@@ -6,7 +6,7 @@ DB = "final_project.db"
 
 
 
-def classify_theme(name: str):
+def classify_theme(name):
     if not isinstance(name, str):
         return None
     n = name.lower()
@@ -25,7 +25,7 @@ def classify_theme(name: str):
     return "other"
 
 
-def load_playlist_data(db_path: str) -> pd.DataFrame:
+def load_playlist_data(db_path):
     conn = sqlite3.connect(db_path)
     df = pd.read_sql_query(
         "SELECT name, month_added FROM spotify_playlists_meta WHERE month_added IS NOT NULL;",
