@@ -4,6 +4,7 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import seaborn as sns
 from datetime import datetime
+import matplotlib.dates as mdates
 
 DB = "final_project.db"
 
@@ -43,8 +44,9 @@ def classify_theme(name):
     
     n = name.lower()
 
-    winter_keywords = ["winter","holiday","christmas","snow","cold","fall","christmas","season"]
-    summer_keywords = ["summer","hot","beach","sun","hot","warm"]
+    winter_keywords = ["winter", "snow", "cold", "christmas", "holiday","ski","traditional"]
+    summer_keywords = ["summer", "beach", "sun", "hot", "warm","house"]
+    
 
     if any(k in n for k in winter_keywords):
         return "winter"
@@ -77,21 +79,32 @@ def make_plot_weathervplaylists():
     playlist_counts = aggregate_playlists_by_month(playlists)
 
     merged = pd.merge(weather_monthly, playlist_counts, on="month", how="left").fillna(0)
+    merged["month_dt"] = pd.to_datetime(merged["month"] + "-01")
+
+    merged = merged.sort_values("month_dt")
+    if len(merged) > 18:
+        merged = merged.tail(24)
+    
+    x = merged["month_dt"]
 
     fig, ax1 = plt.subplots(figsize=(12,6))
 
     x = merged["month"]
 
-    ax1.plot(x,merged["avg_temp"],marker="o",color="red",label="Average Temperature (C)")
+    ax1.plot(x,merged["avg_temp"],marker="o",color="red",label="Average Temperature (°C)")
     ax1.set_xlabel("Month")
-    ax1.set_ylabel("Temperature (C)",color="red")
+    ax1.set_ylabel("Temperature (°C)",color="red")
     ax1.tick_params(axis="y",labelcolor="red")
+    plt.xticks(rotation=50,ha="right")
 
+   
     ax2 = ax1.twinx()
     ax2.plot(x,merged["winter"],marker="s",color="blue",label="Winter Playlists")
     ax2.plot(x,merged["summer"],marker="^", color="orange",label="Summer Playlists")
     ax2.set_ylabel("Number of Seasonal Playlists",color="blue")
     ax2.tick_params(axis="y", labelcolor="blue")
+
+    ax1.grid(axis="y", alpha=0.3, linestyle="--")
 
     plt.title("Average Temperature vs Seasonal Playlist Creation by Month")
 
