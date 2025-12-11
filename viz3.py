@@ -75,6 +75,8 @@ def stacked_bar():
         if theme not in counts.columns:
             counts[theme] = 0
 
+    # playlists by month csv written here ------------------------------------------------
+    counts.to_csv("seasonal_playlists_bymonth.csv",index=False)
     # plot stacked bar chart
     plt.figure(figsize=(12, 6))
 
