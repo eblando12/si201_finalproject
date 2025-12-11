@@ -33,7 +33,7 @@ def scrape_and_store_offical_charts(db_name):
         cur.execute('SELECT id FROM charts WHERE date = ?', (fetching_date,))
         data = cur.fetchone()
 
-        #skipping this iteration to not get a repeat
+        #skipping this iteration to not get a repea
         if data is not None:
             continue
 
