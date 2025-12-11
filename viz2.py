@@ -9,10 +9,10 @@ DB = "final_project.db"
 
 CHARTS_TABLE = "charts"
 
-def load_chart_and_weather(db_path: str) -> tuple[pd.DataFrame, pd.DataFrame]:
+def load_chart_and_weather(db_path):
 
     conn = sqlite3.connect(db_path)
-
+    # SQL SELECT here to get charts and weather data from DB -----------------------------------
     charts = pd.read_sql_query(
         f"SELECT date, position, song_title, artist FROM {CHARTS_TABLE};",
         conn,
@@ -35,7 +35,7 @@ def load_chart_and_weather(db_path: str) -> tuple[pd.DataFrame, pd.DataFrame]:
 
 def compute_song_stat(charts,weather):
     merged = pd.merge(charts,weather,on="date",how="left")
-
+    # copmuting days of song at #1 and then sorting -------------------------------------------------
     grouped = (merged.groupby(["song_title","artist"], as_index=False)
                .agg(days_at_one = ("date","count"),
                     avg_temp_at_one=("temperature","mean"),
@@ -54,6 +54,7 @@ def make_weather_chart_plot():
     
     top = stats_df.head(10).copy()
 
+    # limiting song names - if more than 25 chars, cut it off at 21 and add ...
     def short_title(row):
         title = row["song_title"]
         artist = row["artist"]
@@ -63,6 +64,9 @@ def make_weather_chart_plot():
     top["label"] = top.apply(short_title,axis=1)
 
     x= range(len(top))
+
+    # weather v top song saved to csv here -------------------------------------------
+    top.to_csv("weather_topsong.csv",index=False)
 
     fig,ax1 = plt.subplots(figsize=(12,6))
 
