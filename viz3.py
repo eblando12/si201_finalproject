@@ -11,19 +11,40 @@ def classify_theme(name):
         return None
     n = name.lower()
 
-    winter_keywords = ["winter", "snow", "cold", "christmas", "holiday"]
-    summer_keywords = ["summer", "beach", "sun", "hot", "warm"]
-    fall_keywords = ["fall", "autumn", "rain", "chill", "coffee"]
+    winter_keywords = ["winter", "snow", "cold", "christmas", "holiday","ski","traditional"]
+    summer_keywords = ["summer", "beach", "sun", "hot", "warm","house"]
+    fall_keywords = ["fall", "autumn", "rain", "chill", "coffee","indie","folk"]
+    spring_keywords = ["spring","flowers","rainy","sunshine","bloom","easter","pastel"]
 
     if any(k in n for k in winter_keywords):
-        return "winter"
+        return "Winter"
     if any(k in n for k in summer_keywords):
-        return "summer"
+        return "Summer"
     if any(k in n for k in fall_keywords):
-        return "fall/chill"
+        return "Fall"
+    if any(k in n for k in spring_keywords):
+        return "Spring"
 
     return "other"
 
+
+def season_from_month_str(month_str):
+    if not isinstance(month_str, str) or len(month_str) < 7:
+        return None
+    try:
+        month = int(month_str[5:7])
+    except ValueError:
+        return None
+
+    if month in (12, 1, 2):
+        return "Winter"
+    elif month in (3, 4, 5):
+        return "Spring"
+    elif month in (6, 7, 8):
+        return "Summer"
+    elif month in (9, 10, 11):
+        return "Fall"
+    return None
 
 def load_playlist_data(db_path):
     conn = sqlite3.connect(db_path)
@@ -37,7 +58,7 @@ def load_playlist_data(db_path):
 
 def stacked_bar():
     playlists = load_playlist_data(DB)
-    playlists = playlists[playlists["month_added"] >= "2019-01"]
+    playlists = playlists[playlists["month_added"] >= "2023-01"]
     # assign themes
     playlists["theme"] = playlists["name"].apply(classify_theme)
 
@@ -50,14 +71,14 @@ def stacked_bar():
     )
 
 
-    for theme in ["winter", "summer", "fall/chill", "other"]:
+    for theme in ["Winter", "Summer", "Spring", "Fall"]:
         if theme not in counts.columns:
             counts[theme] = 0
 
     # plot stacked bar chart
     plt.figure(figsize=(12, 6))
 
-    counts[["winter", "summer", "fall/chill", "other"]].plot(
+    counts[["Winter", "Summer", "Spring", "Fall"]].plot(
         kind="bar",
         stacked=True,
         figsize=(14, 7),
