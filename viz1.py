@@ -1,52 +1,19 @@
-import requests
 import sqlite3
 import pandas as pd
 import matplotlib.pyplot as plt
-import seaborn as sns
-from datetime import datetime
-import matplotlib.dates as mdates
 
 DB = "final_project.db"
 
-# loading weather data
-def load_weather_by_month(db_path):
-    conn = sqlite3.connect(db_path)
-
-    weather = pd.read_sql_query("SELECT date, temperature FROM weather;", conn)
-    conn.close()
-
-    weather["date"] = pd.to_datetime(weather["date"])
-
-    weather["month"] = weather["date"].dt.to_period("M").astype(str)
-
-    weather_monthly = (weather.groupby("month", as_index=False)["temperature"]
-                       .mean()
-                       .rename(columns={"temperature":"avg_temp"})
-                       .sort_values("month")
-                       )
-    
-    return weather_monthly
-
-def load_playlists(db_path):
-    conn = sqlite3.connect(db_path)
-    playlists = pd.read_sql_query(
-        "SELECT name,month_added FROM spotify_playlists_meta "
-        "WHERE month_added IS NOT NULL;",
-        conn,
-    )
-    conn.close()
-
-    return playlists
 
 def classify_theme(name):
-    if not isinstance(name,str):
+    if not isinstance(name, str):
         return None
-    
+
+    # classifying themes for each playlist using keywords
     n = name.lower()
 
-    winter_keywords = ["winter", "snow", "cold", "christmas", "holiday","ski","traditional"]
-    summer_keywords = ["summer", "beach", "sun", "hot", "warm","house"]
-    
+    winter_keywords = ["winter", "snow", "cold", "christmas", "holiday", "ski", "traditional"]
+    summer_keywords = ["summer", "beach", "sun", "hot", "warm", "house"]
 
     if any(k in n for k in winter_keywords):
         return "winter"
@@ -54,64 +21,117 @@ def classify_theme(name):
         return "summer"
     return None
 
-def aggregate_playlists_by_month(playlists):
-    playlists["theme"] = playlists["name"].apply(classify_theme)
 
-    playlists = playlists.dropna(subset=["theme"])
+def load_joined_weather_playlists(db_path):
+    conn = sqlite3.connect(db_path)
+    # SQL SELECT and JOIN here ---------------------------------------------------------
+    #   selecting the month part of the date string, and the temperature + name
+    # joining spotify DB with weather ON the date
+    query = """
+        SELECT
+            substr(w.date, 1, 7) AS month,   
+            w.temperature,
+            p.name
+        FROM weather AS w
+        JOIN spotify_playlists_meta AS p 
+          ON substr(w.date, 1, 7) = p.month_added
+        WHERE p.month_added IS NOT NULL;
+    """
 
-    counts = (playlists.groupby(["month_added","theme"])
+    df = pd.read_sql_query(query, conn)
+    conn.close()
+    return df
+
+
+def prepare_monthly_data() -> pd.DataFrame:
+
+    df = load_joined_weather_playlists(DB)
+
+    # computing avg temperature by month here ---------------------------------------------
+    temp_monthly = (
+        df.groupby("month", as_index=False)["temperature"]
+          .mean()
+          .rename(columns={"temperature": "avg_temp"})
+    )
+
+    # playlist classifications 
+    df["theme"] = df["name"].apply(classify_theme)
+    themed = df.dropna(subset=["theme"])
+
+    # count winter and summer playlists per month -----------------------------------------
+    counts = (
+        themed.groupby(["month", "theme"])
               .size()
               .unstack(fill_value=0)
               .reset_index()
-              .rename(columns={"month_added":"month"})
-              .sort_values("month"))
-    
-    if 'winter' not in counts.columns:
-        counts["winter"] = 0
-    if 'summer' not in counts.columns:
-        counts["summer"] = 0
+    )
 
-    return counts
+    # both columns exist even if one theme didn’t appear
+    for col in ["winter", "summer"]:
+        if col not in counts.columns:
+            counts[col] = 0
+
+    merged = pd.merge(temp_monthly, counts, on="month", how="left").fillna(0)
+
+    # create a real datetime month for sorting
+    merged["month_dt"] = pd.to_datetime(merged["month"] + "-01")
+    merged = merged.sort_values("month_dt")
+
+    # only getting last 24 months (2 yrs) so plot isnt crowded
+    if len(merged) > 24:
+        merged = merged.tail(24)
+
+    return merged
+
 
 def make_plot_weathervplaylists():
-    weather_monthly = load_weather_by_month(DB)
-    playlists = load_playlists(DB)
-    playlist_counts = aggregate_playlists_by_month(playlists)
-
-    merged = pd.merge(weather_monthly, playlist_counts, on="month", how="left").fillna(0)
-    merged["month_dt"] = pd.to_datetime(merged["month"] + "-01")
-
-    merged = merged.sort_values("month_dt")
-    if len(merged) > 18:
-        merged = merged.tail(24)
-    
-    x = merged["month_dt"]
-
-    fig, ax1 = plt.subplots(figsize=(12,6))
-
+    merged = prepare_monthly_data()
+ 
     x = merged["month"]
+    # write to csv here ------------------------------------------------------------
+    merged.to_csv("weather_v_playlists.csv",index=False)
 
-    ax1.plot(x,merged["avg_temp"],marker="o",color="red",label="Average Temperature (°C)")
+    # plotting below 
+    fig, ax1 = plt.subplots(figsize=(12, 6))
+
+    # temperature line
+    ax1.plot(
+        x,
+        merged["avg_temp"],
+        marker="o",
+        color="red",
+        label="Average Temperature (°C)",
+    )
     ax1.set_xlabel("Month")
-    ax1.set_ylabel("Temperature (°C)",color="red")
-    ax1.tick_params(axis="y",labelcolor="red")
-    plt.xticks(rotation=50,ha="right")
+    ax1.set_ylabel("Temperature (°C)", color="red")
+    ax1.tick_params(axis="y", labelcolor="red")
+    plt.xticks(rotation=50, ha="right")
 
-   
+    # second axis: seasonal playlists
     ax2 = ax1.twinx()
-    ax2.plot(x,merged["winter"],marker="s",color="blue",label="Winter Playlists")
-    ax2.plot(x,merged["summer"],marker="^", color="orange",label="Summer Playlists")
-    ax2.set_ylabel("Number of Seasonal Playlists",color="blue")
+    ax2.plot(
+        x,
+        merged["winter"],
+        marker="s",
+        color="blue",
+        label="Winter Playlists",
+    )
+    ax2.plot(
+        x,
+        merged["summer"],
+        marker="^",
+        color="orange",
+        label="Summer Playlists",
+    )
+    ax2.set_ylabel("Number of Seasonal Playlists", color="blue")
     ax2.tick_params(axis="y", labelcolor="blue")
 
+    # light grid for readability
     ax1.grid(axis="y", alpha=0.3, linestyle="--")
 
     plt.title("Average Temperature vs Seasonal Playlist Creation by Month")
 
-    # rotate x labels for readability
-    plt.xticks(rotation=45)
-
-    # combined legend
+    # combined legend from both axes
     lines = ax1.get_lines() + ax2.get_lines()
     labels = [line.get_label() for line in lines]
     ax1.legend(lines, labels, loc="upper left")
