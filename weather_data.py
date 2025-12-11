@@ -4,12 +4,15 @@ import my_info
 
 def fetch_and_store_weather_data(start_date,end_date, db_name,city = "London",country = "United Kingdom"):
 
-
+    #connecting to sql database
     conn = sqlite3.connect(db_name)
     cur = conn.cursor()
 
+    #creating the table and making the columns
+    #the INTEGER PRIMARY KEY AUTOINCREMENT helps increase a number for each run to make sure each row is individual
+    #the REAl means it will save a float number
     cur.execute(
-        ''' CREATE TABLE IF NOT EXISTS weather (
+        ''' CREATE TABLE weather (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         city TEXT,
         date TEXT, 
@@ -20,9 +23,12 @@ def fetch_and_store_weather_data(start_date,end_date, db_name,city = "London",co
         ''' )
     conn.commit()
 
+    #making sure location is by london in the uk to set up the API request
     location = f"{city}, {country}"
-
+    #visual crossing URL
     base_url = f"https://weather.visualcrossing.com/VisualCrossingWebServices/rest/services/timeline/{location}/{start_date}/{end_date}"
+    
+    #each parameter meanig: metic helps keep the temperature in celcius, api will return in json, daily weather information, and api key
     params = {
         "unitGroup": "metric",
         "contentType": "json",
@@ -30,7 +36,7 @@ def fetch_and_store_weather_data(start_date,end_date, db_name,city = "London",co
         "key": my_info.visual_crossing_key
     }
     
-    #start_date: "2025-01-01", end_date: "2025-04-30"
+    #start_date: "2025-01-01", end_date: "2025-04-30" possibly, still need to see if we want to do the full year
 
     response = requests.get(base_url,params = params)
     if response.status_code != 200: 
@@ -39,11 +45,16 @@ def fetch_and_store_weather_data(start_date,end_date, db_name,city = "London",co
 
     data = response.json()
 
+    #it looks at the dictionary and returns the value, if not then it will return an empty list
     list_of_days = data.get('days', [])
 
+    #25 day infromation, works like the counter for each row added
     added_items = 0 
+
+    #this loop with go through each days' weather information
     for day in list_of_days:
 
+        #this make sure it doesn't run past 25 items
         if added_items >= 25:
             break
 
@@ -53,16 +64,22 @@ def fetch_and_store_weather_data(start_date,end_date, db_name,city = "London",co
         sunrise_value =day.get('sunrise')
         sunset_value = day.get('sunset')
 
+        #this execution checks for any days that were repeated in the data
         cur.execute("SELECT date FROM weather WHERE date = ?", (datetime_value,))
 
+
+        #checking if that date it not in the data so it can be added
         if cur.fetchone() is None:
             cur.execute(
                 '''
                 INSERT INTO weather (date,city, temperature, description, sunrise, sunset) VALUES (?,?,?,?,?,?)
                 ''', (datetime_value, city, temperature_value, conditions_value, sunrise_value, sunset_value)
             )
+
+            #after adding the weather date information, it will count 1 row has been added
             added_items += 1
 
+    #saves changes
     conn.commit()
     conn.close()
 
@@ -70,54 +87,25 @@ def fetch_and_store_weather_data(start_date,end_date, db_name,city = "London",co
 
    
 if __name__ == "__main__":
-    test_db = "weather_test.db"
 
-    start = "2024-01-01" 
-    end = "2024-06-01"
-    print("--- TEST RUN 1 ---")
-    fetch_and_store_weather_data(start, end, test_db)
+    db_name = "final_project.db"
     
-    # Check the count
-    conn = sqlite3.connect(test_db)
-    cur = conn.cursor()
-    cur.execute("SELECT count(*) FROM weather")
-    count_1 = cur.fetchone()[0]
-    print(f"Rows in DB after Run 1: {count_1} (Should be 25)")
-    conn.close()
-
-    print("\n--- TEST RUN 2 ---")
-    # We run the EXACT same function call again. 
-    # It should skip the first 25 (duplicates) and add the NEXT 25.
-    fetch_and_store_weather_data(start, end, test_db)
+    start_date = "2024-01-01" 
+    end_date = "2024-06-01" 
     
-    conn = sqlite3.connect(test_db)
-    cur = conn.cursor()
-    cur.execute("SELECT count(*) FROM weather")
-    count_2 = cur.fetchone()[0]
-    print(f"Rows in DB after Run 2: {count_2} (Should be 50)")
-    
-    # Check for duplicates
-    cur.execute("SELECT count(DISTINCT date) FROM weather")
-    unique_dates = cur.fetchone()[0]
-    print(f"Unique dates: {unique_dates} (Should match Total Rows: {count_2})")
-    
-    conn.close()
-if __name__ == "__main__":
-    # 1. Define your parameters
-    start = "2025-01-01"
-    end = "2025-02-01"
-    db = "final_project.db"
-    
-    # 2. CALL the function
-    print("Starting weather fetch...")
-    fetch_and_store_weather_data(start, end, db)
-    print("Finished!")
-
-if __name__ == "__main__":
-    db_name = "final_project.db" 
-    start_date = "2024-01-01" # You can adjust these dates
-    end_date = "2024-06-01"
-
-    print(f"Fetching weather data for {db_name}...")
+    # Call the function
     fetch_and_store_weather_data(start_date, end_date, db_name)
-    print("Done!")
+    
+    # checking progress
+    conn = sqlite3.connect(db_name)
+    cur = conn.cursor()
+    cur.execute("SELECT count(*) FROM weather")
+    count = cur.fetchone()[0]
+    conn.close()
+    
+    print(f"rows in 'weather' table: {count}")
+
+    if count < 100:
+        print("need more rows")
+    else:
+        print("100+ rows")
