@@ -85,7 +85,9 @@ def make_visualization_4():
         .sum()
         .reset_index()
     )
- 
+    
+    #theme by month csv written here ---------------------------------------------------
+    grouped.to_csv("theme_by_month.csv",index=False)
     plt.figure(figsize=(12, 6))
 
     colors = {

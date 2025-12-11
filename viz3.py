@@ -10,7 +10,7 @@ def classify_theme(name):
     if not isinstance(name, str):
         return None
     n = name.lower()
-
+    # classifying playlists into seasons
     winter_keywords = ["winter", "snow", "cold", "christmas", "holiday","ski","traditional"]
     summer_keywords = ["summer", "beach", "sun", "hot", "warm","house"]
     fall_keywords = ["fall", "autumn", "rain", "chill", "coffee","indie","folk"]
@@ -35,7 +35,7 @@ def season_from_month_str(month_str):
         month = int(month_str[5:7])
     except ValueError:
         return None
-
+    # classifying by month to group into season bins
     if month in (12, 1, 2):
         return "Winter"
     elif month in (3, 4, 5):
@@ -48,6 +48,7 @@ def season_from_month_str(month_str):
 
 def load_playlist_data(db_path):
     conn = sqlite3.connect(db_path)
+    # SELECT from spotify db here -------------------------------------------------------
     df = pd.read_sql_query(
         "SELECT name, month_added FROM spotify_playlists_meta WHERE month_added IS NOT NULL;",
         conn
@@ -62,7 +63,7 @@ def stacked_bar():
     # assign themes
     playlists["theme"] = playlists["name"].apply(classify_theme)
 
-    # count playlists per month per theme
+    # count playlists per month per theme -------------------------------------------------
     counts = (
         playlists.groupby(["month_added", "theme"])
         .size()
@@ -77,6 +78,7 @@ def stacked_bar():
 
     # playlists by month csv written here ------------------------------------------------
     counts.to_csv("seasonal_playlists_bymonth.csv",index=False)
+    
     # plot stacked bar chart
     plt.figure(figsize=(12, 6))
 
